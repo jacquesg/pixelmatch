@@ -1,6 +1,6 @@
 {
   "name": "@scaryterry/pixelmatch-darwin-arm64",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Native binding for pixelmatch on macOS arm64",
   "os": [
     "darwin"
