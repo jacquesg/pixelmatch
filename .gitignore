@@ -6,9 +6,13 @@ coverage
 tmp
 /dist/
 /target/
+/artifacts/
 *.node
 /wasm/
 
 # napi-rs build artifacts
 index.js
 index.d.ts
+
+# npm lock file (pnpm only)
+package-lock.json

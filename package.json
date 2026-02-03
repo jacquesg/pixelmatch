@@ -99,7 +99,7 @@
     "vitest": "^4.0.18"
   },
   "scripts": {
-    "clean": "rm -rf dist *.node",
+    "clean": "rm -rf dist wasm *.node",
     "build": "run-s clean build:ts build:native build:wasm",
     "build:ts": "tsup",
     "build:native": "napi build --features napi --platform --release",
