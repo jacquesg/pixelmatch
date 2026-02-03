@@ -48,6 +48,18 @@
         "message": "chore: release ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
       }
     ],
-    "@semantic-release/github"
+    [
+      "@semantic-release/github",
+      {
+        "assets": [
+          { "path": "npm/darwin-arm64/*.node", "label": "macOS ARM64" },
+          { "path": "npm/darwin-x64/*.node", "label": "macOS x64" },
+          { "path": "npm/linux-arm64-gnu/*.node", "label": "Linux ARM64" },
+          { "path": "npm/linux-x64-gnu/*.node", "label": "Linux x64 (glibc)" },
+          { "path": "npm/linux-x64-musl/*.node", "label": "Linux x64 (musl)" },
+          { "path": "npm/win32-x64-msvc/*.node", "label": "Windows x64" }
+        ]
+      }
+    ]
   ]
 }
