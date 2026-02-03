@@ -1,3 +1,9 @@
+## [0.0.3](https://github.com/jacquesg/pixelmatch/compare/v0.0.2...v0.0.3) (2026-02-03)
+
+### Bug Fixes
+
+* npm scope ([c3b9a71](https://github.com/jacquesg/pixelmatch/commit/c3b9a711ee5c30c6662d32dabceeb6db14e80298))
+
 ## [0.0.2](https://github.com/jacquesg/pixelmatch/compare/v0.0.1...v0.0.2) (2026-02-03)
 
 ### Bug Fixes
