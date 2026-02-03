@@ -21,38 +21,38 @@ with multiple backend options for different environments and performance require
 ## Installation
 
 ```bash
-pnpm add @jacquesg/pixelmatch
+pnpm add @scaryterry/pixelmatch
 ```
 
 The native binding is distributed as optional platform-specific packages that
 install automatically:
 
-| Platform          | Package                                |
-| ----------------- | -------------------------------------- |
-| macOS arm64       | `@jacquesg/pixelmatch-darwin-arm64`    |
-| macOS x64         | `@jacquesg/pixelmatch-darwin-x64`      |
-| Linux x64 (glibc) | `@jacquesg/pixelmatch-linux-x64-gnu`   |
-| Linux x64 (musl)  | `@jacquesg/pixelmatch-linux-x64-musl`  |
-| Linux arm64       | `@jacquesg/pixelmatch-linux-arm64-gnu` |
-| Windows x64       | `@jacquesg/pixelmatch-win32-x64-msvc`  |
+| Platform          | Package                                  |
+| ----------------- | ---------------------------------------- |
+| macOS arm64       | `@scaryterry/pixelmatch-darwin-arm64`    |
+| macOS x64         | `@scaryterry/pixelmatch-darwin-x64`      |
+| Linux x64 (glibc) | `@scaryterry/pixelmatch-linux-x64-gnu`   |
+| Linux x64 (musl)  | `@scaryterry/pixelmatch-linux-x64-musl`  |
+| Linux arm64       | `@scaryterry/pixelmatch-linux-arm64-gnu` |
+| Windows x64       | `@scaryterry/pixelmatch-win32-x64-msvc`  |
 
 If the native binding is unavailable for your platform, the JS fallback is
 used automatically.
 
 ## Backends
 
-| Backend                   | Entry point                      | Environment             | Speed    |
-| ------------------------- | -------------------------------- | ----------------------- | -------- |
-| **Native** (Rust/napi-rs) | `@jacquesg/pixelmatch` (Node.js) | Node.js                 | Fastest  |
-| **JS fallback**           | `@jacquesg/pixelmatch/fallback`  | Node.js, browsers       | Baseline |
-| **WASM**                  | `@jacquesg/pixelmatch/wasm`      | Browsers, edge runtimes | Fast     |
+| Backend                   | Entry point                        | Environment             | Speed    |
+| ------------------------- | ---------------------------------- | ----------------------- | -------- |
+| **Native** (Rust/napi-rs) | `@scaryterry/pixelmatch` (Node.js) | Node.js                 | Fastest  |
+| **JS fallback**           | `@scaryterry/pixelmatch/fallback`  | Node.js, browsers       | Baseline |
+| **WASM**                  | `@scaryterry/pixelmatch/wasm`      | Browsers, edge runtimes | Fast     |
 
-The default entry point (`@jacquesg/pixelmatch`) automatically loads the native
+The default entry point (`@scaryterry/pixelmatch`) automatically loads the native
 binding when available and falls back to the pure JS implementation. You can
 check which backend is active via the `_backend` property:
 
 ```ts
-import pixelmatch from '@jacquesg/pixelmatch';
+import pixelmatch from '@scaryterry/pixelmatch';
 
 console.log(pixelmatch._backend); // 'native' or 'js'
 ```
@@ -97,7 +97,7 @@ Compares two images pixel by pixel and returns the number of mismatched pixels.
 ```ts
 import fs from 'node:fs';
 import { PNG } from 'pngjs';
-import pixelmatch from '@jacquesg/pixelmatch';
+import pixelmatch from '@scaryterry/pixelmatch';
 
 const img1 = PNG.sync.read(fs.readFileSync('img1.png'));
 const img2 = PNG.sync.read(fs.readFileSync('img2.png'));
@@ -112,7 +112,7 @@ fs.writeFileSync('diff.png', PNG.sync.write(diff));
 ### Pure JS fallback (Node.js or browsers)
 
 ```ts
-import pixelmatch from '@jacquesg/pixelmatch/fallback';
+import pixelmatch from '@scaryterry/pixelmatch/fallback';
 
 const numDiffPixels = pixelmatch(img1, img2, diff, 800, 600, { threshold: 0.1 });
 ```
@@ -120,7 +120,7 @@ const numDiffPixels = pixelmatch(img1, img2, diff, 800, 600, { threshold: 0.1 })
 ### WASM (browsers / edge runtimes)
 
 ```ts
-import pixelmatch, { initialize } from '@jacquesg/pixelmatch/wasm';
+import pixelmatch, { initialize } from '@scaryterry/pixelmatch/wasm';
 
 // Initialise the WASM module (call once)
 await initialize();
@@ -131,7 +131,7 @@ const numDiffPixels = pixelmatch(img1, img2, diff, 800, 600, { threshold: 0.1 })
 ### Browser (Canvas API)
 
 ```ts
-import pixelmatch from '@jacquesg/pixelmatch/fallback';
+import pixelmatch from '@scaryterry/pixelmatch/fallback';
 
 const img1 = img1Context.getImageData(0, 0, width, height);
 const img2 = img2Context.getImageData(0, 0, width, height);

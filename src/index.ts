@@ -35,11 +35,11 @@ type PixelmatchFunction = {
 };
 
 const triples: Record<string, string> = {
-  'darwin-arm64': '@jacquesg/pixelmatch-darwin-arm64',
-  'darwin-x64': '@jacquesg/pixelmatch-darwin-x64',
-  'linux-x64': '@jacquesg/pixelmatch-linux-x64-gnu',
-  'linux-arm64': '@jacquesg/pixelmatch-linux-arm64-gnu',
-  'win32-x64': '@jacquesg/pixelmatch-win32-x64-msvc',
+  'darwin-arm64': '@scaryterry/pixelmatch-darwin-arm64',
+  'darwin-x64': '@scaryterry/pixelmatch-darwin-x64',
+  'linux-x64': '@scaryterry/pixelmatch-linux-x64-gnu',
+  'linux-arm64': '@scaryterry/pixelmatch-linux-arm64-gnu',
+  'win32-x64': '@scaryterry/pixelmatch-win32-x64-msvc',
 };
 
 function isPixelData(arr: ArrayBufferView | null): arr is PixelData {
@@ -64,7 +64,7 @@ function loadNativeBinding(): NativeBinding | null {
       binding = req(triples[key]);
     } catch {
       if (process.platform === 'linux') {
-        binding = req('@jacquesg/pixelmatch-linux-x64-musl');
+        binding = req('@scaryterry/pixelmatch-linux-x64-musl');
       } else {
         return null;
       }

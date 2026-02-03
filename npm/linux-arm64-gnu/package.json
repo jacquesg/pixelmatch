@@ -1,5 +1,5 @@
 {
-  "name": "@jacquesg/pixelmatch-linux-arm64-gnu",
+  "name": "@scaryterry/pixelmatch-linux-arm64-gnu",
   "version": "0.0.2",
   "description": "Native binding for pixelmatch on Linux arm64 (glibc)",
   "os": [

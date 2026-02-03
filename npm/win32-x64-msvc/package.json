@@ -1,5 +1,5 @@
 {
-  "name": "@jacquesg/pixelmatch-win32-x64-msvc",
+  "name": "@scaryterry/pixelmatch-win32-x64-msvc",
   "version": "0.0.2",
   "description": "Native binding for pixelmatch on Windows x64",
   "os": [

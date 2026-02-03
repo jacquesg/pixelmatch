@@ -1,5 +1,5 @@
 {
-  "name": "@jacquesg/pixelmatch",
+  "name": "@scaryterry/pixelmatch",
   "version": "0.0.2",
   "type": "module",
   "description": "The smallest and fastest pixel-level image comparison library.",
@@ -68,7 +68,7 @@
       "aarch64-unknown-linux-gnu",
       "x86_64-pc-windows-msvc"
     ],
-    "packageName": "@jacquesg/pixelmatch"
+    "packageName": "@scaryterry/pixelmatch"
   },
   "optionalDependencies": {},
   "devDependencies": {

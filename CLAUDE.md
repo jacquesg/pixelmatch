@@ -67,11 +67,11 @@ tests/
 
 ## Entry Points
 
-| Import Path                     | Backend     | Use Case                      |
-| ------------------------------- | ----------- | ----------------------------- |
-| `@jacquesg/pixelmatch`          | Native → JS | Node.js (auto-selects native) |
-| `@jacquesg/pixelmatch/fallback` | JS          | Browser, explicit fallback    |
-| `@jacquesg/pixelmatch/wasm`     | WASM        | Browser, edge runtimes        |
+| Import Path                       | Backend     | Use Case                      |
+| --------------------------------- | ----------- | ----------------------------- |
+| `@scaryterry/pixelmatch`          | Native → JS | Node.js (auto-selects native) |
+| `@scaryterry/pixelmatch/fallback` | JS          | Browser, explicit fallback    |
+| `@scaryterry/pixelmatch/wasm`     | WASM        | Browser, edge runtimes        |
 
 ## Algorithm Notes
 
@@ -87,8 +87,8 @@ These changes are documented in `src/pixelmatch.ts:120-136` and `crate/aa.rs`.
 
 Native bindings are distributed as optional platform-specific packages:
 
-- `@jacquesg/pixelmatch-darwin-arm64` / `darwin-x64`
-- `@jacquesg/pixelmatch-linux-x64-gnu` / `linux-x64-musl` / `linux-arm64-gnu`
-- `@jacquesg/pixelmatch-win32-x64-msvc`
+- `@scaryterry/pixelmatch-darwin-arm64` / `darwin-x64`
+- `@scaryterry/pixelmatch-linux-x64-gnu` / `linux-x64-musl` / `linux-arm64-gnu`
+- `@scaryterry/pixelmatch-win32-x64-msvc`
 
 The `napi artifacts` command collects built binaries into the `npm/` directory for publishing.
