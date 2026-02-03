@@ -1,7 +1,6 @@
 # pixelmatch
 
-[![Node](https://github.com/jacquesg/pixelmatch/actions/workflows/node.yml/badge.svg)](https://github.com/jacquesg/pixelmatch/actions/workflows/node.yml)
-[![Build](https://github.com/jacquesg/pixelmatch/actions/workflows/build.yml/badge.svg)](https://github.com/jacquesg/pixelmatch/actions/workflows/build.yml)
+[![CI](https://github.com/jacquesg/pixelmatch/actions/workflows/ci.yml/badge.svg)](https://github.com/jacquesg/pixelmatch/actions/workflows/ci.yml)
 
 A pixel-level image comparison library with accurate **anti-aliased pixel detection**
 and **perceptual colour difference metrics**. Originally designed for comparing
