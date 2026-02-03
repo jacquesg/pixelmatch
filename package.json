@@ -1,6 +1,6 @@
 {
   "name": "@jacquesg/pixelmatch",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "module",
   "description": "The smallest and fastest pixel-level image comparison library.",
   "main": "./dist/pixelmatch.cjs",

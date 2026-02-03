@@ -1,9 +1,13 @@
 {
   "name": "@jacquesg/pixelmatch-darwin-arm64",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Native binding for pixelmatch on macOS arm64",
-  "os": ["darwin"],
-  "cpu": ["arm64"],
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
   "main": "pixelmatch.darwin-arm64.node",
   "license": "ISC",
   "engines": {
