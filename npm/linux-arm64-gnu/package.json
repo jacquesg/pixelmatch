@@ -1,0 +1,27 @@
+{
+  "name": "@jacquesg/pixelmatch-linux-arm64-gnu",
+  "version": "0.0.0",
+  "description": "Native binding for pixelmatch on Linux arm64 (glibc)",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "main": "pixelmatch.linux-arm64-gnu.node",
+  "libc": [
+    "glibc"
+  ],
+  "license": "ISC",
+  "engines": {
+    "node": ">= 18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jacquesg/pixelmatch.git"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  }
+}

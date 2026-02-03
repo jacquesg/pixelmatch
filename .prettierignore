@@ -1,0 +1,8 @@
+dist/
+wasm/
+target/
+crate/
+npm/
+*.node
+pnpm-lock.yaml
+CHANGELOG.md

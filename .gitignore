@@ -1,0 +1,14 @@
+*.log
+node_modules
+.DS_Store
+.nyc_output
+coverage
+tmp
+/dist/
+/target/
+*.node
+/wasm/
+
+# napi-rs build artifacts
+index.js
+index.d.ts

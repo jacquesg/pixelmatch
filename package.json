@@ -1,0 +1,139 @@
+{
+  "name": "@jacquesg/pixelmatch",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "The smallest and fastest pixel-level image comparison library.",
+  "main": "./dist/pixelmatch.cjs",
+  "module": "./dist/pixelmatch.mjs",
+  "types": "./dist/pixelmatch.d.ts",
+  "exports": {
+    ".": {
+      "node": {
+        "import": {
+          "types": "./dist/index.d.ts",
+          "default": "./dist/index.mjs"
+        },
+        "require": {
+          "types": "./dist/index.d.cts",
+          "default": "./dist/index.cjs"
+        }
+      },
+      "import": {
+        "types": "./dist/pixelmatch.d.ts",
+        "default": "./dist/pixelmatch.mjs"
+      },
+      "require": {
+        "types": "./dist/pixelmatch.d.cts",
+        "default": "./dist/pixelmatch.cjs"
+      }
+    },
+    "./fallback": {
+      "import": {
+        "types": "./dist/pixelmatch.d.ts",
+        "default": "./dist/pixelmatch.mjs"
+      },
+      "require": {
+        "types": "./dist/pixelmatch.d.cts",
+        "default": "./dist/pixelmatch.cjs"
+      }
+    },
+    "./wasm": {
+      "import": {
+        "types": "./dist/wasm.d.ts",
+        "default": "./dist/wasm.mjs"
+      },
+      "require": {
+        "types": "./dist/wasm.d.cts",
+        "default": "./dist/wasm.cjs"
+      }
+    }
+  },
+  "bin": {
+    "pixelmatch": "dist/cli.mjs"
+  },
+  "files": [
+    "dist/",
+    "wasm/"
+  ],
+  "dependencies": {
+    "pngjs": "^7.0.0"
+  },
+  "napi": {
+    "binaryName": "pixelmatch",
+    "targets": [
+      "x86_64-apple-darwin",
+      "aarch64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "x86_64-unknown-linux-musl",
+      "aarch64-unknown-linux-gnu",
+      "x86_64-pc-windows-msvc"
+    ],
+    "packageName": "@jacquesg/pixelmatch"
+  },
+  "optionalDependencies": {},
+  "devDependencies": {
+    "@commitlint/cli": "^20.4.1",
+    "@commitlint/config-conventional": "^20.4.1",
+    "@eslint/js": "^9.28.0",
+    "@napi-rs/cli": "^3",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/exec": "^7.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@types/pngjs": "^6.0.5",
+    "commitizen": "^4.3.0",
+    "conventional-changelog-conventionalcommits": "^9.1.0",
+    "cz-conventional-changelog": "^3.3.0",
+    "eslint": "^9.28.0",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-plugin-import-x": "^4.12.0",
+    "husky": "^9.1.7",
+    "jiti": "^2.6.1",
+    "lint-staged": "^16.1.0",
+    "npm-run-all2": "^8.0.4",
+    "prettier": "^3.5.3",
+    "semantic-release": "^25.0.3",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.54.0",
+    "vitest": "^4.0.18"
+  },
+  "scripts": {
+    "clean": "rm -rf dist *.node",
+    "build": "run-s clean build:ts build:native build:wasm",
+    "build:ts": "tsup",
+    "build:native": "napi build --features napi --platform --release",
+    "build:wasm": "wasm-pack build --target web --out-dir wasm -- --features wasm --no-default-features && rm -f wasm/.gitignore",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint",
+    "lint:fix": "eslint --fix",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "test:rust": "cargo test",
+    "bench": "tsx bench.ts",
+    "artifacts": "napi artifacts --npm-dir npm",
+    "prepublishOnly": "napi prepublish -t npm --skip-optional-publish",
+    "version": "napi version",
+    "release": "semantic-release",
+    "prepare": "husky",
+    "cz": "cz"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jacquesg/pixelmatch.git"
+  },
+  "keywords": [
+    "image",
+    "comparison",
+    "diff"
+  ],
+  "author": "Jacques Germishuys",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jacquesg/pixelmatch/issues"
+  },
+  "homepage": "https://github.com/jacquesg/pixelmatch#readme"
+}

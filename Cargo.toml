@@ -1,0 +1,40 @@
+[package]
+name = "pixelmatch"
+version = "0.0.0"
+edition = "2021"
+license = "ISC"
+description = "The smallest and fastest pixel-level image comparison library"
+
+[lib]
+path = "crate/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+bytemuck = { version = "1", features = ["derive"] }
+rayon = "1"
+
+# napi-rs (native addon)
+napi = { version = "2", features = ["napi8"], optional = true }
+napi-derive = { version = "2", optional = true }
+
+# wasm-bindgen
+wasm-bindgen = { version = "0.2", optional = true }
+
+[build-dependencies]
+napi-build = { version = "2", optional = true }
+
+[features]
+default = []
+napi = ["dep:napi", "dep:napi-derive", "dep:napi-build"]
+wasm = ["dep:wasm-bindgen"]
+
+[dev-dependencies]
+png = "0.17"
+
+[[bench]]
+name = "pixelmatch"
+harness = false
+
+[profile.release]
+lto = true
+opt-level = 3

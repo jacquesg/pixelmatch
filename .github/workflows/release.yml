@@ -1,0 +1,204 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (no actual release)'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
+  build-native:
+    name: Build ${{ matrix.target }}
+    needs: ci
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            os: macos-15-intel
+          - target: aarch64-apple-darwin
+            os: macos-14
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ matrix.target }}-cargo-
+
+      - name: Install cross-compilation tools (Linux ARM64)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Install musl tools
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build native binding
+        run: pnpm build:native --target ${{ matrix.target }}
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bindings-${{ matrix.target }}
+          path: '*.node'
+          if-no-files-found: error
+
+  build-wasm:
+    name: Build WASM
+    needs: ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: wasm-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            wasm-cargo-
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+      - run: wasm-pack build --target web --out-dir wasm -- --features wasm --no-default-features
+      - run: rm -f wasm/.gitignore
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasm-build
+          path: wasm/
+          if-no-files-found: error
+
+  release:
+    name: Release
+    needs: [build-native, build-wasm]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:ts
+
+      - name: Download native bindings
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: bindings-*
+          merge-multiple: true
+
+      - name: Download WASM build
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-build
+          path: wasm
+
+      - name: Move artefacts to npm directories
+        run: pnpm artifacts --output-dir artifacts
+
+      - name: Verify artefacts
+        run: |
+          echo "=== Verifying all artefacts are present ==="
+
+          # Check native bindings
+          expected_bindings=(
+            "npm/darwin-arm64/pixelmatch.darwin-arm64.node"
+            "npm/darwin-x64/pixelmatch.darwin-x64.node"
+            "npm/linux-arm64-gnu/pixelmatch.linux-arm64-gnu.node"
+            "npm/linux-x64-gnu/pixelmatch.linux-x64-gnu.node"
+            "npm/linux-x64-musl/pixelmatch.linux-x64-musl.node"
+            "npm/win32-x64-msvc/pixelmatch.win32-x64-msvc.node"
+          )
+
+          for binding in "${expected_bindings[@]}"; do
+            if [ ! -f "$binding" ]; then
+              echo "ERROR: Missing $binding"
+              exit 1
+            fi
+            echo "OK: $binding ($(du -h "$binding" | cut -f1))"
+          done
+
+          # Check WASM
+          if [ ! -f "wasm/pixelmatch_bg.wasm" ]; then
+            echo "ERROR: Missing wasm/pixelmatch_bg.wasm"
+            exit 1
+          fi
+          echo "OK: wasm/pixelmatch_bg.wasm ($(du -h wasm/pixelmatch_bg.wasm | cut -f1))"
+
+          echo ""
+          echo "=== All artefacts verified ==="
+
+      - name: Run semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            pnpm release --dry-run
+          else
+            pnpm release
+          fi

@@ -1,0 +1,9 @@
+# Disable FMA contraction to ensure byte-exact compatibility with JS floating-point.
+# LLVM may emit fused multiply-add instructions that combine multiply+add with a single
+# rounding step. The colorDelta function has dense multiply-accumulate chains where a
+# 1-ULP FMA difference propagates through y*y and can flip threshold comparisons.
+[build]
+rustflags = ["-C", "llvm-args=-fp-contract=off"]
+
+[target.aarch64-unknown-linux-gnu]
+linker = "aarch64-linux-gnu-gcc"
