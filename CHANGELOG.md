@@ -1,3 +1,9 @@
+## [0.0.5](https://github.com/jacquesg/pixelmatch/compare/v0.0.4...v0.0.5) (2026-02-03)
+
+### Bug Fixes
+
+* ci release fixes ([19b0947](https://github.com/jacquesg/pixelmatch/commit/19b0947d1e1383a961da25f7b2091b8811d5c256))
+
 ## [0.0.4](https://github.com/jacquesg/pixelmatch/compare/v0.0.3...v0.0.4) (2026-02-03)
 
 ### Bug Fixes
