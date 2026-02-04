@@ -46,6 +46,26 @@
         "types": "./dist/wasm.d.cts",
         "default": "./dist/wasm.cjs"
       }
+    },
+    "./compat": {
+      "node": {
+        "import": {
+          "types": "./dist/compat.d.ts",
+          "default": "./dist/compat.mjs"
+        },
+        "require": {
+          "types": "./dist/compat.d.cts",
+          "default": "./dist/compat.cjs"
+        }
+      },
+      "import": {
+        "types": "./dist/compat-fallback.d.ts",
+        "default": "./dist/compat-fallback.mjs"
+      },
+      "require": {
+        "types": "./dist/compat-fallback.d.cts",
+        "default": "./dist/compat-fallback.cjs"
+      }
     }
   },
   "bin": {

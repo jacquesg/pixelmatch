@@ -41,11 +41,12 @@ used automatically.
 
 ## Backends
 
-| Backend                   | Entry point                        | Environment             | Speed    |
-| ------------------------- | ---------------------------------- | ----------------------- | -------- |
-| **Native** (Rust/napi-rs) | `@scaryterry/pixelmatch` (Node.js) | Node.js                 | Fastest  |
-| **JS fallback**           | `@scaryterry/pixelmatch/fallback`  | Node.js, browsers       | Baseline |
-| **WASM**                  | `@scaryterry/pixelmatch/wasm`      | Browsers, edge runtimes | Fast     |
+| Backend                   | Entry point                        | API    | Environment             | Speed    |
+| ------------------------- | ---------------------------------- | ------ | ----------------------- | -------- |
+| **Native** (Rust/napi-rs) | `@scaryterry/pixelmatch` (Node.js) | New    | Node.js                 | Fastest  |
+| **JS fallback**           | `@scaryterry/pixelmatch/fallback`  | New    | Node.js, browsers       | Baseline |
+| **WASM**                  | `@scaryterry/pixelmatch/wasm`      | New    | Browsers, edge runtimes | Fast     |
+| **Compat**                | `@scaryterry/pixelmatch/compat`    | Legacy | Node.js, browsers       | Varies   |
 
 The default entry point (`@scaryterry/pixelmatch`) automatically loads the native
 binding when available and falls back to the pure JS implementation. You can
@@ -57,6 +58,10 @@ import pixelmatch from '@scaryterry/pixelmatch';
 console.log(pixelmatch._backend); // 'native' or 'js'
 ```
 
+The `./compat` entry point provides a drop-in replacement for the
+[mapbox/pixelmatch](https://github.com/mapbox/pixelmatch) API (see
+[Migration from mapbox/pixelmatch](#migration-from-mapboxpixelmatch)).
+
 ## Example output
 
 | expected                  | actual                    | diff                         |
@@ -67,28 +72,38 @@ console.log(pixelmatch._backend); // 'native' or 'js'
 
 ## API
 
-### `pixelmatch(img1, img2, output, width, height[, options])`
+### `pixelmatch(img1, img2[, options])`
 
-Compares two images pixel by pixel and returns the number of mismatched pixels.
+Compares two equally sized images pixel by pixel.
 
-- **`img1`**, **`img2`** — Image data of the images to compare (`Uint8Array` or `Uint8ClampedArray`).
-  Must have equal dimensions.
-- **`output`** — Image data to write the diff to, or `null` if you don't need
-  a diff image.
-- **`width`**, **`height`** — Width and height of the images. All three images
-  must share the same dimensions.
+- **`img1`**, **`img2`** — `ImageLike` objects with `data`, `width`, and `height`
+  properties. `data` must be a `Uint8Array` or `Uint8ClampedArray` of length
+  `width * height * 4` (RGBA). Objects from `pngjs`, Canvas `getImageData()`,
+  and similar libraries satisfy this interface directly.
+- **`options`** — Optional `PixelmatchOptions` object (see below).
+
+Returns a `PixelmatchResult`:
+
+| Property         | Type      | Description                                |
+| ---------------- | --------- | ------------------------------------------ |
+| `diffCount`      | `number`  | Number of mismatched pixels.               |
+| `diffPercentage` | `number`  | `diffCount / totalPixels` (0 to 1).        |
+| `totalPixels`    | `number`  | Total number of pixels (`width * height`). |
+| `aaCount`        | `number`  | Number of anti-aliased pixels detected.    |
+| `identical`      | `boolean` | Whether the two images are byte-identical. |
 
 **`options`**:
 
-| Option         | Type        | Default         | Description                                                                                              |
-| -------------- | ----------- | --------------- | -------------------------------------------------------------------------------------------------------- |
-| `threshold`    | `number`    | `0.1`           | Matching threshold (`0` to `1`). Smaller values make the comparison more sensitive.                      |
-| `includeAA`    | `boolean`   | `false`         | If `true`, disables detecting and ignoring anti-aliased pixels.                                          |
-| `alpha`        | `number`    | `0.1`           | Blending factor of unchanged pixels in the diff output. `0` for pure white, `1` for original brightness. |
-| `aaColor`      | `[R, G, B]` | `[255, 255, 0]` | Colour of anti-aliased pixels in the diff output.                                                        |
-| `diffColor`    | `[R, G, B]` | `[255, 0, 0]`   | Colour of differing pixels in the diff output.                                                           |
-| `diffColorAlt` | `[R, G, B]` | `null`          | Alternative colour for dark-on-light differences. If not set, all differing pixels use `diffColor`.      |
-| `diffMask`     | `boolean`   | `false`         | Draw the diff over a transparent background (a mask), rather than over the original image.               |
+| Option               | Type        | Default         | Description                                                                                              |
+| -------------------- | ----------- | --------------- | -------------------------------------------------------------------------------------------------------- |
+| `threshold`          | `number`    | `0.1`           | Matching threshold (`0` to `1`). Smaller values make the comparison more sensitive.                      |
+| `detectAntiAliasing` | `boolean`   | `true`          | Detect anti-aliased pixels and exclude them from the diff count.                                         |
+| `output`             | `PixelData` | `undefined`     | Buffer to write the diff image into. Must be `width * height * 4` bytes.                                 |
+| `alpha`              | `number`    | `0.1`           | Blending factor of unchanged pixels in the diff output. `0` for pure white, `1` for original brightness. |
+| `aaColor`            | `[R, G, B]` | `[255, 255, 0]` | Colour of anti-aliased pixels in the diff output.                                                        |
+| `diffColor`          | `[R, G, B]` | `[255, 0, 0]`   | Colour of differing pixels in the diff output.                                                           |
+| `diffColorAlt`       | `[R, G, B]` | `undefined`     | Alternative colour for dark-on-light differences. If not set, all differing pixels use `diffColor`.      |
+| `diffMask`           | `boolean`   | `false`         | Draw the diff over a transparent background (a mask), rather than over the original image.               |
 
 ## Usage
 
@@ -104,17 +119,25 @@ const img2 = PNG.sync.read(fs.readFileSync('img2.png'));
 const { width, height } = img1;
 const diff = new PNG({ width, height });
 
-pixelmatch(img1.data, img2.data, diff.data, width, height, { threshold: 0.1 });
+const result = pixelmatch(img1, img2, { threshold: 0.1, output: diff.data });
+
+console.log(`${result.diffCount} pixels differ (${(result.diffPercentage * 100).toFixed(2)}%)`);
+console.log(`anti-aliased pixels: ${result.aaCount}`);
+console.log(`identical: ${result.identical}`);
 
 fs.writeFileSync('diff.png', PNG.sync.write(diff));
 ```
+
+> PNG objects from `pngjs` have `data`, `width`, and `height` properties, so
+> they satisfy the `ImageLike` interface directly — no need to destructure.
 
 ### Pure JS fallback (Node.js or browsers)
 
 ```ts
 import pixelmatch from '@scaryterry/pixelmatch/fallback';
 
-const numDiffPixels = pixelmatch(img1, img2, diff, 800, 600, { threshold: 0.1 });
+const result = pixelmatch(img1, img2, { threshold: 0.1 });
+console.log(result.diffCount);
 ```
 
 ### WASM (browsers / edge runtimes)
@@ -125,7 +148,8 @@ import pixelmatch, { initialize } from '@scaryterry/pixelmatch/wasm';
 // Initialise the WASM module (call once)
 await initialize();
 
-const numDiffPixels = pixelmatch(img1, img2, diff, 800, 600, { threshold: 0.1 });
+const result = pixelmatch(img1, img2, { threshold: 0.1 });
+console.log(result.diffCount);
 ```
 
 ### Browser (Canvas API)
@@ -137,15 +161,41 @@ const img1 = img1Context.getImageData(0, 0, width, height);
 const img2 = img2Context.getImageData(0, 0, width, height);
 const diff = diffContext.createImageData(width, height);
 
-pixelmatch(img1.data, img2.data, diff.data, width, height, { threshold: 0.1 });
+const result = pixelmatch(img1, img2, { threshold: 0.1, output: diff.data });
 
 diffContext.putImageData(diff, 0, 0);
 ```
 
+## Migration from mapbox/pixelmatch
+
+The `./compat` entry point is a drop-in replacement for
+[mapbox/pixelmatch](https://github.com/mapbox/pixelmatch), preserving the
+original positional-parameter signature:
+
+```ts
+import pixelmatch from '@scaryterry/pixelmatch/compat';
+
+// Same API as mapbox/pixelmatch — returns a number (diff count)
+const numDiffPixels = pixelmatch(img1.data, img2.data, diff.data, width, height, {
+  threshold: 0.1,
+  includeAA: false,
+});
+```
+
+On Node.js, `./compat` uses the native backend (with JS fallback). In browsers,
+it uses the pure JS backend. The compat layer maps the legacy options to the new
+API internally.
+
+| Legacy option    | New option                 | Notes                                                     |
+| ---------------- | -------------------------- | --------------------------------------------------------- |
+| `includeAA`      | `detectAntiAliasing`       | Inverted: `includeAA: false` = `detectAntiAliasing: true` |
+| `output` (param) | `options.output`           | Moved from positional parameter to options                |
+| Returns `number` | Returns `PixelmatchResult` | Compat wrapper returns `.diffCount`                       |
+
 ## Command line
 
 ```bash
-pixelmatch image1.png image2.png [diff.png] [threshold] [includeAA]
+pixelmatch image1.png image2.png [diff.png] [threshold] [detectAntiAliasing]
 ```
 
 **Exit codes:**

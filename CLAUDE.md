@@ -45,17 +45,21 @@ UPDATE=1 pnpm test
 
 ```
 src/
+├── types.ts        # Shared types: ImageLike, PixelmatchOptions, PixelmatchResult
+├── validate.ts     # Input validation: isPixelData, validateInput
 ├── pixelmatch.ts   # Core algorithm (JS fallback) - anti-aliasing detection, YIQ colour delta
 ├── index.ts        # Node.js entry - auto-loads native binding, falls back to JS
 ├── wasm.ts         # WASM entry - wraps wasm-bindgen bindings
+├── compat.ts       # Compat entry (Node.js) - mapbox/pixelmatch-compatible API
+├── compat-fallback.ts # Compat entry (browser) - mapbox/pixelmatch-compatible API
 └── cli.ts          # CLI tool
 
 crate/
-├── lib.rs          # Core algorithm (Rust) - parallelised with rayon
+├── lib.rs          # Core algorithm (Rust) - parallelised with rayon, returns MatchResult
 ├── aa.rs           # Anti-aliasing detection
 ├── color.rs        # YIQ colour delta calculation
-├── napi_bindings.rs # napi-rs bindings for Node.js
-└── wasm_bindings.rs # wasm-bindgen bindings
+├── napi_bindings.rs # napi-rs bindings for Node.js (returns NapiMatchResult)
+└── wasm_bindings.rs # wasm-bindgen bindings (returns WasmMatchResult)
 
 test/
 ├── pixelmatch.test.ts  # Vitest tests
@@ -65,13 +69,33 @@ tests/
 └── integration.rs      # Rust integration tests
 ```
 
+## API
+
+All backends share the same signature:
+
+```typescript
+pixelmatch(img1: ImageLike, img2: ImageLike, options?: PixelmatchOptions): PixelmatchResult
+```
+
+- `ImageLike`: `{ data: Uint8Array | Uint8ClampedArray, width: number, height: number }`
+- `PixelmatchResult`: `{ diffCount, diffPercentage, totalPixels, aaCount, identical }`
+- `output` buffer is now an option (`options.output`) instead of a positional parameter
+- `detectAntiAliasing` (default: `true`) replaces the inverted `includeAA` (default: `false`)
+
+The `./compat` entry preserves the old mapbox/pixelmatch-compatible flat API:
+
+```typescript
+pixelmatch(img1, img2, output, width, height, options?): number
+```
+
 ## Entry Points
 
-| Import Path                       | Backend     | Use Case                      |
-| --------------------------------- | ----------- | ----------------------------- |
-| `@scaryterry/pixelmatch`          | Native → JS | Node.js (auto-selects native) |
-| `@scaryterry/pixelmatch/fallback` | JS          | Browser, explicit fallback    |
-| `@scaryterry/pixelmatch/wasm`     | WASM        | Browser, edge runtimes        |
+| Import Path                       | API    | Backend     | Use Case                              |
+| --------------------------------- | ------ | ----------- | ------------------------------------- |
+| `@scaryterry/pixelmatch`          | New    | Native → JS | Node.js (auto-selects native)         |
+| `@scaryterry/pixelmatch/fallback` | New    | JS          | Browser, explicit fallback            |
+| `@scaryterry/pixelmatch/wasm`     | New    | WASM        | Browser, edge runtimes                |
+| `@scaryterry/pixelmatch/compat`   | Compat | Native → JS | Drop-in mapbox/pixelmatch replacement |
 
 ## Algorithm Notes
 
@@ -81,7 +105,7 @@ The anti-aliasing detection includes two improvements over the original mapbox/p
 
 2. **Relaxed sibling check**: Requires `hasManySiblings` in _either_ image instead of _both_ (improves detection for 1px strokes and thin text)
 
-These changes are documented in `src/pixelmatch.ts:120-136` and `crate/aa.rs`.
+These changes are documented in `src/pixelmatch.ts:105-123` and `crate/aa.rs`.
 
 ## Platform Binaries
 

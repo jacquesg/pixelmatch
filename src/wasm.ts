@@ -1,6 +1,14 @@
-import type { PixelData, PixelmatchOptions } from './pixelmatch.js';
+import type { ImageLike, PixelData, PixelmatchOptions, PixelmatchResult } from './types.js';
+import { buildResult, validateInput } from './validate.js';
 
-export type { PixelData, PixelmatchOptions } from './pixelmatch.js';
+export type { ImageLike, PixelData, PixelmatchOptions, PixelmatchResult } from './types.js';
+
+interface WasmMatchResult {
+  readonly diff_count: number;
+  readonly aa_count: number;
+  readonly identical: boolean;
+  [Symbol.dispose](): void;
+}
 
 interface WasmBindings {
   default: (wasmUrl?: string | URL) => Promise<void>;
@@ -11,7 +19,7 @@ interface WasmBindings {
     width: number,
     height: number,
     threshold: number,
-    includeAA: boolean,
+    detectAntiAliasing: boolean,
     alpha: number,
     aaR: number,
     aaG: number,
@@ -24,14 +32,14 @@ interface WasmBindings {
     altG: number,
     altB: number,
     diffMask: boolean,
-  ) => number;
+  ) => WasmMatchResult;
   pixelmatch_wasm_count: (
     img1: PixelData,
     img2: PixelData,
     width: number,
     height: number,
     threshold: number,
-    includeAA: boolean,
+    detectAntiAliasing: boolean,
     alpha: number,
     aaR: number,
     aaG: number,
@@ -44,7 +52,7 @@ interface WasmBindings {
     altG: number,
     altB: number,
     diffMask: boolean,
-  ) => number;
+  ) => WasmMatchResult;
 }
 
 let bg: WasmBindings | null = null;
@@ -57,72 +65,76 @@ export async function initialize(wasmUrl?: string | URL): Promise<void> {
 }
 
 export default function pixelmatch(
-  img1: PixelData,
-  img2: PixelData,
-  output: PixelData | null | undefined,
-  width: number,
-  height: number,
+  img1: ImageLike,
+  img2: ImageLike,
   options: PixelmatchOptions = {},
-): number {
+): PixelmatchResult {
   if (!bg) throw new Error('WASM not initialised. Call initialize() first.');
 
   const {
     threshold = 0.1,
-    includeAA = false,
+    detectAntiAliasing = true,
     alpha = 0.1,
     aaColor = [255, 255, 0],
     diffColor = [255, 0, 0],
     diffColorAlt,
     diffMask = false,
+    output,
   } = options;
+
+  validateInput(img1, img2, output);
+
+  const { data: data1, width, height } = img1;
+  const { data: data2 } = img2;
+  const totalPixels = width * height;
 
   const [aaR, aaG, aaB] = aaColor;
   const [diffR, diffG, diffB] = diffColor;
   const hasAlt = !!diffColorAlt;
   const [altR, altG, altB] = diffColorAlt || diffColor;
 
-  if (output) {
-    return bg.pixelmatch_wasm(
-      img1,
-      img2,
-      output,
-      width,
-      height,
-      threshold,
-      includeAA,
-      alpha,
-      aaR,
-      aaG,
-      aaB,
-      diffR,
-      diffG,
-      diffB,
-      hasAlt,
-      altR,
-      altG,
-      altB,
-      diffMask,
-    );
-  }
+  using raw = output
+    ? bg.pixelmatch_wasm(
+        data1,
+        data2,
+        output,
+        width,
+        height,
+        threshold,
+        detectAntiAliasing,
+        alpha,
+        aaR,
+        aaG,
+        aaB,
+        diffR,
+        diffG,
+        diffB,
+        hasAlt,
+        altR,
+        altG,
+        altB,
+        diffMask,
+      )
+    : bg.pixelmatch_wasm_count(
+        data1,
+        data2,
+        width,
+        height,
+        threshold,
+        detectAntiAliasing,
+        alpha,
+        aaR,
+        aaG,
+        aaB,
+        diffR,
+        diffG,
+        diffB,
+        hasAlt,
+        altR,
+        altG,
+        altB,
+        diffMask,
+      );
 
-  return bg.pixelmatch_wasm_count(
-    img1,
-    img2,
-    width,
-    height,
-    threshold,
-    includeAA,
-    alpha,
-    aaR,
-    aaG,
-    aaB,
-    diffR,
-    diffG,
-    diffB,
-    hasAlt,
-    altR,
-    altG,
-    altB,
-    diffMask,
-  );
+  return buildResult(raw.diff_count, raw.aa_count, totalPixels, raw.identical);
 }

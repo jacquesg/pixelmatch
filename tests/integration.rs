@@ -35,7 +35,7 @@ fn diff_test(img1_name: &str, img2_name: &str, diff_name: &str, options: Options
 
     // Test with output
     let mut diff = vec![0u8; img1.len()];
-    let mismatch = pixelmatch(&img1, &img2, Some(&mut diff), width, height, &options)
+    let result = pixelmatch(&img1, &img2, Some(&mut diff), width, height, &options)
         .expect("pixelmatch should not error");
 
     // Compare diff image to reference
@@ -46,17 +46,25 @@ fn diff_test(img1_name: &str, img2_name: &str, diff_name: &str, options: Options
     );
 
     assert_eq!(
-        mismatch, expected_mismatch,
+        result.diff_count, expected_mismatch,
         "number of mismatched pixels for {img1_name} vs {img2_name}"
     );
 
-    // Test without output — should produce the same count
-    let mismatch2 = pixelmatch(&img1, &img2, None, width, height, &options)
+    // Test without output — should produce the same count and aa_count
+    let result2 = pixelmatch(&img1, &img2, None, width, height, &options)
         .expect("pixelmatch should not error");
 
     assert_eq!(
-        mismatch, mismatch2,
-        "mismatch count should be the same with and without output for {img1_name} vs {img2_name}"
+        result.diff_count, result2.diff_count,
+        "diff_count should be the same with and without output for {img1_name} vs {img2_name}"
+    );
+    assert_eq!(
+        result.aa_count, result2.aa_count,
+        "aa_count should be the same with and without output for {img1_name} vs {img2_name}"
+    );
+    assert_eq!(
+        result.identical, result2.identical,
+        "identical should be the same with and without output for {img1_name} vs {img2_name}"
     );
 }
 
@@ -76,7 +84,7 @@ fn test_1a_1b_diffmask() {
         "1a",
         "1b",
         "1diffmask",
-        Options { threshold: 0.05, include_aa: false, diff_mask: true, ..Default::default() },
+        Options { threshold: 0.05, diff_mask: true, ..Default::default() },
         109,
     );
 }
@@ -150,6 +158,58 @@ fn test_8a_5b() {
     diff_test("8a", "5b", "8diff", Options { threshold: 0.05, ..Default::default() }, 32896);
 }
 
+// --- Identical image tests ---
+
+#[test]
+fn test_identical_images() {
+    let (img1, width, height) = read_image("1a");
+    let result = pixelmatch(&img1, &img1, None, width, height, &Default::default())
+        .expect("pixelmatch should not error");
+    assert!(result.identical, "identical images should have identical = true");
+    assert_eq!(result.diff_count, 0);
+    assert_eq!(result.aa_count, 0);
+}
+
+#[test]
+fn test_different_images_not_identical() {
+    let (img1, width, height) = read_image("1a");
+    let (img2, _, _) = read_image("1b");
+    let result = pixelmatch(&img1, &img2, None, width, height, &Options { threshold: 0.05, ..Default::default() })
+        .expect("pixelmatch should not error");
+    assert!(!result.identical, "different images should have identical = false");
+}
+
+// --- AA count tests ---
+
+#[test]
+fn test_aa_count_with_detection() {
+    let (img1, width, height) = read_image("1a");
+    let (img2, _, _) = read_image("1b");
+
+    // With AA detection (default)
+    let with_aa = pixelmatch(&img1, &img2, None, width, height, &Options { threshold: 0.05, ..Default::default() })
+        .expect("pixelmatch should not error");
+
+    // Without AA detection
+    let without_aa = pixelmatch(
+        &img1,
+        &img2,
+        None,
+        width,
+        height,
+        &Options { threshold: 0.05, detect_anti_aliasing: false, ..Default::default() },
+    )
+    .expect("pixelmatch should not error");
+
+    assert!(with_aa.aa_count > 0, "aa_count should be > 0 when AA detection is enabled");
+    assert_eq!(without_aa.aa_count, 0, "aa_count should be 0 when AA detection is disabled");
+    assert_eq!(
+        without_aa.diff_count,
+        with_aa.diff_count + with_aa.aa_count,
+        "without AA: diffCount should equal with AA: diffCount + aaCount"
+    );
+}
+
 // --- Error handling tests ---
 
 #[test]
@@ -170,7 +230,8 @@ fn test_image_data_size_mismatch() {
 fn test_1x1_identical() {
     let img = [255u8, 0, 0, 255]; // red pixel
     let result = pixelmatch(&img, &img, None, 1, 1, &Default::default()).unwrap();
-    assert_eq!(result, 0);
+    assert_eq!(result.diff_count, 0);
+    assert!(result.identical);
 }
 
 #[test]
@@ -178,7 +239,8 @@ fn test_1x1_different() {
     let img1 = [255u8, 0, 0, 255]; // red
     let img2 = [0u8, 0, 255, 255]; // blue
     let result = pixelmatch(&img1, &img2, None, 1, 1, &Options { threshold: 0.0, ..Default::default() }).unwrap();
-    assert_eq!(result, 1);
+    assert_eq!(result.diff_count, 1);
+    assert!(!result.identical);
 }
 
 #[test]
@@ -187,7 +249,8 @@ fn test_1xn_image() {
     let img1 = [255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255];
     let img2 = [255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255];
     let result = pixelmatch(&img1, &img2, None, 1, 3, &Default::default()).unwrap();
-    assert_eq!(result, 0);
+    assert_eq!(result.diff_count, 0);
+    assert!(result.identical);
 }
 
 #[test]
@@ -196,7 +259,8 @@ fn test_nx1_image() {
     let img1 = [255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255];
     let img2 = [255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255];
     let result = pixelmatch(&img1, &img2, None, 3, 1, &Default::default()).unwrap();
-    assert_eq!(result, 0);
+    assert_eq!(result.diff_count, 0);
+    assert!(result.identical);
 }
 
 // --- Property tests ---

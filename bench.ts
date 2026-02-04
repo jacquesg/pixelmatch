@@ -10,7 +10,7 @@ console.time('match');
 let sum = 0;
 for (let i = 0; i < 100; i++) {
   for (const [img1, img2] of data) {
-    sum += match(img1.data, img2.data, null, img1.width, img1.height);
+    sum += match(img1, img2).diffCount;
   }
 }
 console.timeEnd('match');

@@ -15,8 +15,8 @@ pub fn color_delta_public(img1: &[u8], img2: &[u8], k: usize, m: usize, y_only: 
 pub struct Options {
     /// Matching threshold (0 to 1); smaller is more sensitive. Default: 0.1
     pub threshold: f64,
-    /// Whether to skip anti-aliasing detection. Default: false
-    pub include_aa: bool,
+    /// Whether to detect and exclude anti-aliased pixels from the diff count. Default: true
+    pub detect_anti_aliasing: bool,
     /// Opacity of original image in diff output. Default: 0.1
     pub alpha: f64,
     /// Colour of anti-aliased pixels in diff output [R, G, B]. Default: [255, 255, 0]
@@ -33,7 +33,7 @@ impl Default for Options {
     fn default() -> Self {
         Self {
             threshold: 0.1,
-            include_aa: false,
+            detect_anti_aliasing: true,
             alpha: 0.1,
             aa_color: [255, 255, 0],
             diff_color: [255, 0, 0],
@@ -78,6 +78,17 @@ impl std::fmt::Display for PixelmatchError {
 
 impl std::error::Error for PixelmatchError {}
 
+/// Result of a pixel comparison.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MatchResult {
+    /// Number of mismatched pixels.
+    pub diff_count: u32,
+    /// Number of anti-aliased pixels detected.
+    pub aa_count: u32,
+    /// Whether the two images are byte-identical.
+    pub identical: bool,
+}
+
 /// Read a u32 from a byte slice without alignment requirements.
 #[inline(always)]
 pub(crate) fn read_u32_ne(data: &[u8], i: usize) -> u32 {
@@ -92,7 +103,7 @@ pub(crate) fn read_u32_ne(data: &[u8], i: usize) -> u32 {
     }
 }
 
-/// Process a single row, returning the diff count (no output).
+/// Process a single row, returning (diff_count, aa_count) (no output).
 #[inline]
 fn process_row_no_output(
     img1: &[u8],
@@ -101,9 +112,10 @@ fn process_row_no_output(
     w: usize,
     h: usize,
     max_delta: f64,
-    include_aa: bool,
-) -> u32 {
+    detect_anti_aliasing: bool,
+) -> (u32, u32) {
     let mut diff: u32 = 0;
+    let mut aa: u32 = 0;
     for x in 0..w {
         let pos = (y * w + x) * 4;
 
@@ -114,19 +126,20 @@ fn process_row_no_output(
         };
 
         if delta.abs() > max_delta {
-            if include_aa {
-                diff += 1;
-            } else if !antialiased(img1, x, y, w, h, img1, img2)
-                && !antialiased(img2, x, y, w, h, img2, img1)
+            if detect_anti_aliasing
+                && (antialiased(img1, x, y, w, h, img1, img2)
+                    || antialiased(img2, x, y, w, h, img2, img1))
             {
+                aa += 1;
+            } else {
                 diff += 1;
             }
         }
     }
-    diff
+    (diff, aa)
 }
 
-/// Process a single row with output writing.
+/// Process a single row with output writing, returning (diff_count, aa_count).
 #[inline]
 fn process_row_with_output(
     img1: &[u8],
@@ -140,8 +153,9 @@ fn process_row_with_output(
     aa_r: u8, aa_g: u8, aa_b: u8,
     diff_r: u8, diff_g: u8, diff_b: u8,
     alt_r: u8, alt_g: u8, alt_b: u8,
-) -> u32 {
+) -> (u32, u32) {
     let mut diff: u32 = 0;
+    let mut aa: u32 = 0;
     for x in 0..w {
         let pos = (y * w + x) * 4;
         let lpos = x * 4;
@@ -153,11 +167,12 @@ fn process_row_with_output(
         };
 
         if delta.abs() > max_delta {
-            let is_excluded_aa = !options.include_aa
+            let is_aa = options.detect_anti_aliasing
                 && (antialiased(img1, x, y, w, h, img1, img2)
                     || antialiased(img2, x, y, w, h, img2, img1));
 
-            if is_excluded_aa {
+            if is_aa {
+                aa += 1;
                 if !options.diff_mask {
                     draw_pixel(out_row, lpos, aa_r, aa_g, aa_b);
                 }
@@ -173,12 +188,13 @@ fn process_row_with_output(
             draw_gray_pixel_local(img1, pos, options.alpha, out_row, lpos);
         }
     }
-    diff
+    (diff, aa)
 }
 
 /// Compare two equally sized images, pixel by pixel.
 ///
-/// Returns the number of mismatched pixels.
+/// Returns a `MatchResult` containing the diff count, anti-aliased pixel count,
+/// and whether the images are byte-identical.
 pub fn pixelmatch(
     img1: &[u8],
     img2: &[u8],
@@ -186,7 +202,7 @@ pub fn pixelmatch(
     width: u32,
     height: u32,
     options: &Options,
-) -> Result<u32, PixelmatchError> {
+) -> Result<MatchResult, PixelmatchError> {
     let len = (width as usize)
         .checked_mul(height as usize)
         .ok_or(PixelmatchError::DimensionOverflow)?;
@@ -229,7 +245,7 @@ pub fn pixelmatch(
                 }
             }
         }
-        return Ok(0);
+        return Ok(MatchResult { diff_count: 0, aa_count: 0, identical: true });
     }
 
     let max_delta = 35215.0 * options.threshold * options.threshold;
@@ -237,10 +253,10 @@ pub fn pixelmatch(
     let [diff_r, diff_g, diff_b] = options.diff_color;
     let [alt_r, alt_g, alt_b] = options.diff_color_alt.unwrap_or(options.diff_color);
 
-    match output {
+    let (diff_count, aa_count) = match output {
         Some(out) => {
             let row_bytes = w * 4;
-            let diff: u32 = out
+            out
                 .par_chunks_mut(row_bytes)
                 .with_min_len(4)
                 .enumerate()
@@ -250,20 +266,20 @@ pub fn pixelmatch(
                         aa_r, aa_g, aa_b, diff_r, diff_g, diff_b, alt_r, alt_g, alt_b,
                     )
                 })
-                .sum();
-            Ok(diff)
+                .reduce(|| (0, 0), |(d1, a1), (d2, a2)| (d1 + d2, a1 + a2))
         }
         None => {
-            let diff: u32 = (0..h)
+            (0..h)
                 .into_par_iter()
                 .with_min_len(4)
                 .map(|y| {
-                    process_row_no_output(img1, img2, y, w, h, max_delta, options.include_aa)
+                    process_row_no_output(img1, img2, y, w, h, max_delta, options.detect_anti_aliasing)
                 })
-                .sum();
-            Ok(diff)
+                .reduce(|| (0, 0), |(d1, a1), (d2, a2)| (d1 + d2, a1 + a2))
         }
-    }
+    };
+
+    Ok(MatchResult { diff_count, aa_count, identical: false })
 }
 
 /// Draw a grayscale pixel into a row-local output slice.

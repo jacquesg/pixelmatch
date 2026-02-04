@@ -1,8 +1,25 @@
 import { createRequire } from 'node:module';
+import type { ImageLike, PixelData, PixelmatchOptions, PixelmatchResult } from './types.js';
+import { buildResult, validateInput } from './validate.js';
 import jsFallback from './pixelmatch.js';
-import type { PixelData, PixelmatchOptions } from './pixelmatch.js';
 
-export type { PixelData, PixelmatchOptions } from './pixelmatch.js';
+export type { ImageLike, PixelData, PixelmatchOptions, PixelmatchResult } from './types.js';
+
+interface NativeMatchResult {
+  diffCount: number;
+  aaCount: number;
+  identical: boolean;
+}
+
+interface NativeOptions {
+  threshold?: number;
+  detectAntiAliasing?: boolean;
+  alpha?: number;
+  aaColor?: number[];
+  diffColor?: number[];
+  diffColorAlt?: number[];
+  diffMask?: boolean;
+}
 
 interface NativeBinding {
   pixelmatch: (
@@ -11,26 +28,19 @@ interface NativeBinding {
     output: PixelData,
     width: number,
     height: number,
-    options: PixelmatchOptions,
-  ) => number;
+    options: NativeOptions,
+  ) => NativeMatchResult;
   pixelmatchCount: (
     img1: PixelData,
     img2: PixelData,
     width: number,
     height: number,
-    options: PixelmatchOptions,
-  ) => number;
+    options: NativeOptions,
+  ) => NativeMatchResult;
 }
 
 type PixelmatchFunction = {
-  (
-    img1: PixelData,
-    img2: PixelData,
-    output: PixelData | null | undefined,
-    width: number,
-    height: number,
-    options?: PixelmatchOptions,
-  ): number;
+  (img1: ImageLike, img2: ImageLike, options?: PixelmatchOptions): PixelmatchResult;
   _backend: 'native' | 'js';
 };
 
@@ -42,16 +52,14 @@ const triples: Record<string, string> = {
   'win32-x64': '@scaryterry/pixelmatch-win32-x64-msvc',
 };
 
-function isPixelData(arr: ArrayBufferView | null): arr is PixelData {
-  return ArrayBuffer.isView(arr) && (arr as Uint8Array).BYTES_PER_ELEMENT === 1;
-}
-
 function isNativeBinding(value: unknown): value is NativeBinding {
   return (
     typeof value === 'object' &&
     value !== null &&
-    typeof (value as Record<string, unknown>).pixelmatch === 'function' &&
-    typeof (value as Record<string, unknown>).pixelmatchCount === 'function'
+    'pixelmatch' in value &&
+    typeof value.pixelmatch === 'function' &&
+    'pixelmatchCount' in value &&
+    typeof value.pixelmatchCount === 'function'
   );
 }
 
@@ -81,34 +89,30 @@ const native = loadNativeBinding();
 if (native) {
   const { pixelmatch: nativeMatch, pixelmatchCount } = native;
 
-  const fn = (
-    img1: PixelData,
-    img2: PixelData,
-    output: PixelData | null | undefined,
-    width: number,
-    height: number,
-    options: PixelmatchOptions = {},
-  ): number => {
-    if (!isPixelData(img1) || !isPixelData(img2) || (output && !isPixelData(output)))
-      throw new Error('Image data: Uint8Array, Uint8ClampedArray or Buffer expected.');
-    if (img1.length !== img2.length || (output && output.length !== img1.length))
-      throw new Error(`Image sizes do not match. Image 1 size: ${img1.length}, image 2 size: ${img2.length}`);
-    if (img1.length !== width * height * 4)
-      throw new Error(
-        `Image data size does not match width/height. Expecting ${width * height * 4}. Got ${img1.length}`,
-      );
+  const fn = (img1: ImageLike, img2: ImageLike, options: PixelmatchOptions = {}): PixelmatchResult => {
+    const { output, ...rest } = options;
+    validateInput(img1, img2, output);
 
+    const { data: data1, width, height } = img1;
+    const { data: data2 } = img2;
+    const totalPixels = width * height;
+
+    let raw: NativeMatchResult;
     if (output) {
-      return nativeMatch(img1, img2, output, width, height, options);
+      raw = nativeMatch(data1, data2, output, width, height, rest);
+    } else {
+      raw = pixelmatchCount(data1, data2, width, height, rest);
     }
-    return pixelmatchCount(img1, img2, width, height, options);
+
+    return buildResult(raw.diffCount, raw.aaCount, totalPixels, raw.identical);
   };
   fn._backend = 'native' as const;
   impl = fn;
 } else {
-  const fn = jsFallback as PixelmatchFunction;
-  fn._backend = 'js' as const;
-  impl = fn;
+  impl = Object.assign(
+    (img1: ImageLike, img2: ImageLike, options?: PixelmatchOptions) => jsFallback(img1, img2, options),
+    { _backend: 'js' as const },
+  );
 }
 
 export default impl;

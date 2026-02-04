@@ -6,12 +6,19 @@ use crate::{Options, PixelmatchError};
 #[napi(object)]
 pub struct PixelmatchOptions {
     pub threshold: Option<f64>,
-    pub include_aa: Option<bool>,
+    pub detect_anti_aliasing: Option<bool>,
     pub alpha: Option<f64>,
     pub aa_color: Option<Vec<u32>>,
     pub diff_color: Option<Vec<u32>>,
     pub diff_color_alt: Option<Vec<u32>>,
     pub diff_mask: Option<bool>,
+}
+
+#[napi(object)]
+pub struct NapiMatchResult {
+    pub diff_count: u32,
+    pub aa_count: u32,
+    pub identical: bool,
 }
 
 fn convert_options(opts: Option<PixelmatchOptions>) -> Options {
@@ -20,8 +27,8 @@ fn convert_options(opts: Option<PixelmatchOptions>) -> Options {
         if let Some(t) = o.threshold {
             options.threshold = t;
         }
-        if let Some(aa) = o.include_aa {
-            options.include_aa = aa;
+        if let Some(aa) = o.detect_anti_aliasing {
+            options.detect_anti_aliasing = aa;
         }
         if let Some(a) = o.alpha {
             options.alpha = a;
@@ -53,7 +60,7 @@ fn map_error(e: PixelmatchError) -> napi::Error {
 }
 
 /// Compare two images pixel by pixel, writing the diff to the output buffer.
-/// Returns a new Buffer containing the diff image and the mismatch count.
+/// Returns a NapiMatchResult with diff_count, aa_count, and identical fields.
 #[napi]
 pub fn pixelmatch(
     img1: &[u8],
@@ -62,12 +69,17 @@ pub fn pixelmatch(
     width: u32,
     height: u32,
     options: Option<PixelmatchOptions>,
-) -> Result<u32> {
+) -> Result<NapiMatchResult> {
     let opts = convert_options(options);
-    crate::pixelmatch(img1, img2, Some(output.as_mut()), width, height, &opts).map_err(map_error)
+    let result = crate::pixelmatch(img1, img2, Some(output.as_mut()), width, height, &opts).map_err(map_error)?;
+    Ok(NapiMatchResult {
+        diff_count: result.diff_count,
+        aa_count: result.aa_count,
+        identical: result.identical,
+    })
 }
 
-/// Compare two images pixel by pixel, returning only the mismatch count (no diff output).
+/// Compare two images pixel by pixel, returning only the match result (no diff output).
 #[napi]
 pub fn pixelmatch_count(
     img1: &[u8],
@@ -75,7 +87,12 @@ pub fn pixelmatch_count(
     width: u32,
     height: u32,
     options: Option<PixelmatchOptions>,
-) -> Result<u32> {
+) -> Result<NapiMatchResult> {
     let opts = convert_options(options);
-    crate::pixelmatch(img1, img2, None, width, height, &opts).map_err(map_error)
+    let result = crate::pixelmatch(img1, img2, None, width, height, &opts).map_err(map_error)?;
+    Ok(NapiMatchResult {
+        diff_count: result.diff_count,
+        aa_count: result.aa_count,
+        identical: result.identical,
+    })
 }

@@ -1,56 +1,34 @@
-export type PixelData = Uint8Array | Uint8ClampedArray;
+import type { ImageLike, PixelData, PixelmatchOptions, PixelmatchResult } from './types.js';
+import { buildResult, validateInput } from './validate.js';
 
-export interface PixelmatchOptions {
-  threshold?: number;
-  includeAA?: boolean;
-  alpha?: number;
-  aaColor?: [number, number, number];
-  diffColor?: [number, number, number];
-  diffColorAlt?: [number, number, number];
-  diffMask?: boolean;
-}
-
-function isPixelData(arr: ArrayBufferView | null): arr is PixelData {
-  // work around instanceof Uint8Array not working properly in some Jest environments
-  return ArrayBuffer.isView(arr) && (arr as Uint8Array).BYTES_PER_ELEMENT === 1;
-}
+export type { ImageLike, PixelData, PixelmatchOptions, PixelmatchResult } from './types.js';
 
 /**
  * Compare two equally sized images, pixel by pixel.
  *
- * @return The number of mismatched pixels.
+ * @return A PixelmatchResult with diffCount, diffPercentage, totalPixels, aaCount, and identical.
  */
-export default function pixelmatch(
-  img1: PixelData,
-  img2: PixelData,
-  output: PixelData | null | undefined,
-  width: number,
-  height: number,
-  options: PixelmatchOptions = {},
-): number {
+export default function pixelmatch(img1: ImageLike, img2: ImageLike, options: PixelmatchOptions = {}): PixelmatchResult {
   const {
     threshold = 0.1,
     alpha = 0.1,
     aaColor = [255, 255, 0],
     diffColor = [255, 0, 0],
-    includeAA,
+    detectAntiAliasing = true,
     diffColorAlt,
     diffMask,
+    output,
   } = options;
 
-  if (!isPixelData(img1) || !isPixelData(img2) || (output && !isPixelData(output)))
-    throw new Error('Image data: Uint8Array, Uint8ClampedArray or Buffer expected.');
+  validateInput(img1, img2, output);
 
-  if (img1.length !== img2.length || (output && output.length !== img1.length))
-    throw new Error(`Image sizes do not match. Image 1 size: ${img1.length}, image 2 size: ${img2.length}`);
-
-  if (img1.length !== width * height * 4)
-    throw new Error(`Image data size does not match width/height. Expecting ${width * height * 4}. Got ${img1.length}`);
+  const { data: data1, width, height } = img1;
+  const { data: data2 } = img2;
 
   // check if images are identical
   const len = width * height;
-  const a32 = new Uint32Array(img1.buffer, img1.byteOffset, len);
-  const b32 = new Uint32Array(img2.buffer, img2.byteOffset, len);
+  const a32 = new Uint32Array(data1.buffer, data1.byteOffset, len);
+  const b32 = new Uint32Array(data2.buffer, data2.byteOffset, len);
   let identical = true;
 
   for (let i = 0; i < len; i++) {
@@ -62,9 +40,9 @@ export default function pixelmatch(
   if (identical) {
     // fast path if identical
     if (output && !diffMask) {
-      for (let i = 0; i < len; i++) drawGrayPixel(img1, 4 * i, alpha, output);
+      for (let i = 0; i < len; i++) drawGrayPixel(data1, 4 * i, alpha, output);
     }
-    return 0;
+    return buildResult(0, 0, len, true);
   }
 
   // maximum acceptable square distance between two colours;
@@ -74,6 +52,7 @@ export default function pixelmatch(
   const [diffR, diffG, diffB] = diffColor;
   const [altR, altG, altB] = diffColorAlt || diffColor;
   let diff = 0;
+  let aaCount = 0;
 
   // compare each pixel of one image against the other one
   for (let y = 0; y < height; y++) {
@@ -82,15 +61,17 @@ export default function pixelmatch(
       const pos = i * 4;
 
       // squared YUV distance between colours at this pixel position, negative if the img2 pixel is darker
-      const delta = a32[i] === b32[i] ? 0 : colorDelta(img1, img2, pos, pos, false);
+      const delta = a32[i] === b32[i] ? 0 : colorDelta(data1, data2, pos, pos, false);
 
       // the colour difference is above the threshold
       if (Math.abs(delta) > maxDelta) {
         // check it's a real rendering difference or just anti-aliasing
-        const isExcludedAA =
-          !includeAA &&
-          (antialiased(img1, x, y, width, height, a32, b32) || antialiased(img2, x, y, width, height, b32, a32));
-        if (isExcludedAA) {
+        const isAA =
+          detectAntiAliasing &&
+          (antialiased(data1, x, y, width, height, a32, b32) ||
+            antialiased(data2, x, y, width, height, b32, a32));
+        if (isAA) {
+          aaCount++;
           // one of the pixels is anti-aliasing; draw as yellow and do not count as difference
           // note that we do not include such pixels in a mask
           if (output && !diffMask) drawPixel(output, pos, aaR, aaG, aaB);
@@ -107,13 +88,12 @@ export default function pixelmatch(
         }
       } else if (output && !diffMask) {
         // pixels are similar; draw background as grayscale image blended with white
-        drawGrayPixel(img1, pos, alpha, output);
+        drawGrayPixel(data1, pos, alpha, output);
       }
     }
   }
 
-  // return the number of different pixels
-  return diff;
+  return buildResult(diff, aaCount, len, false);
 }
 
 /**

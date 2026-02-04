@@ -6,6 +6,8 @@ export default defineConfig([
       pixelmatch: 'src/pixelmatch.ts',
       index: 'src/index.ts',
       wasm: 'src/wasm.ts',
+      compat: 'src/compat.ts',
+      'compat-fallback': 'src/compat-fallback.ts',
     },
     format: ['esm', 'cjs'],
     dts: true,
