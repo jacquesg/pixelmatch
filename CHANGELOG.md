@@ -1,3 +1,9 @@
+## [0.0.8](https://github.com/jacquesg/pixelmatch/compare/v0.0.7...v0.0.8) (2026-02-04)
+
+### Features
+
+* redesign API with structured results, compat layer, and review fixes ([a9d279c](https://github.com/jacquesg/pixelmatch/commit/a9d279c2356bc34616c905301abf9d22a524913c))
+
 ## [0.0.7](https://github.com/jacquesg/pixelmatch/compare/v0.0.6...v0.0.7) (2026-02-03)
 
 ### Bug Fixes
